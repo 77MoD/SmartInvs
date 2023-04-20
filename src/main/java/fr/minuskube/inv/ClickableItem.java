@@ -5,10 +5,10 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.function.Consumer;
 
-public class ClickableItem {
+public class ClickableItem{
 
-    private ItemStack item;
-    private Consumer<InventoryClickEvent> consumer;
+    private final ItemStack item;
+    private final Consumer<InventoryClickEvent> consumer;
 
     private ClickableItem(ItemStack item, Consumer<InventoryClickEvent> consumer) {
         this.item = item;
@@ -17,6 +17,9 @@ public class ClickableItem {
 
     public static ClickableItem empty(ItemStack item) {
         return of(item, e -> {});
+    }
+    public static ClickableItem inactive(ItemStack item){
+        return of(item, event -> event.setCancelled(true));
     }
 
     public static ClickableItem of(ItemStack item, Consumer<InventoryClickEvent> consumer) {

@@ -20,8 +20,7 @@ public interface SlotIterator {
     SlotIterator previous();
     SlotIterator next();
 
-    SlotIterator blacklist(int row, int column);
-    SlotIterator blacklist(SlotPos slotPos);
+    SlotIterator blacklist(int slot);
 
     int row();
     SlotIterator row(int row);
@@ -38,15 +37,15 @@ public interface SlotIterator {
 
     class Impl implements SlotIterator {
 
-        private InventoryContents contents;
-        private SmartInventory inv;
+        private final InventoryContents contents;
+        private final SmartInventory inv;
 
-        private Type type;
+        private final Type type;
         private boolean started = false;
         private boolean allowOverride = true;
         private int row, column;
 
-        private Set<SlotPos> blacklisted = new HashSet<>();
+        private final Set<Integer> blacklisted = new HashSet<>();
 
         public Impl(InventoryContents contents, SmartInventory inv,
                     Type type, int startRow, int startColumn) {
@@ -149,15 +148,12 @@ public interface SlotIterator {
             return this;
         }
 
-        @Override
-        public SlotIterator blacklist(int row, int column) {
-            this.blacklisted.add(SlotPos.of(row, column));
-            return this;
-        }
+
 
         @Override
-        public SlotIterator blacklist(SlotPos slotPos) {
-            return blacklist(slotPos.getRow(), slotPos.getColumn());
+        public SlotIterator blacklist(int slot) {
+            blacklisted.add(slot);
+            return this;
         }
 
         @Override
@@ -199,7 +195,7 @@ public interface SlotIterator {
         }
 
         private boolean canPlace() {
-            return !blacklisted.contains(SlotPos.of(row, column)) && (allowOverride || !this.get().isPresent());
+            return !blacklisted.contains(row* inv.getColumns() + column) && (allowOverride || !this.get().isPresent());
         }
 
     }

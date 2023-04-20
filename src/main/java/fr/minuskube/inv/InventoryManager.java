@@ -19,6 +19,7 @@ import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -34,18 +35,18 @@ import java.util.logging.Level;
 
 public class InventoryManager {
 
-    private JavaPlugin plugin;
-    private PluginManager pluginManager;
+    private final Plugin plugin;
+    private final PluginManager pluginManager;
 
-    private Map<UUID, SmartInventory> inventories;
-    private Map<UUID, InventoryContents> contents;
+    private final Map<UUID, SmartInventory> inventories;
+    private final Map<UUID, InventoryContents> contents;
 
-    private List<InventoryOpener> defaultOpeners;
-    private List<InventoryOpener> openers;
+    private final List<InventoryOpener> defaultOpeners;
+    private final List<InventoryOpener> openers;
 
-    public InventoryManager(JavaPlugin plugin) {
+    public InventoryManager(Plugin plugin) {
         this.plugin = plugin;
-        this.pluginManager = Bukkit.getPluginManager();
+        this.pluginManager = plugin.getServer().getPluginManager();
 
         this.inventories = new HashMap<>();
         this.contents = new HashMap<>();
@@ -87,7 +88,7 @@ public class InventoryManager {
 
         this.inventories.forEach((player, playerInv) -> {
             if (inv.equals(playerInv))
-                list.add(Bukkit.getPlayer(player));
+                list.add(plugin.getServer().getPlayer(player));
         });
 
         return list;
@@ -118,13 +119,13 @@ public class InventoryManager {
     public void handleInventoryOpenError(SmartInventory inventory, Player player, Exception exception) {
         inventory.close(player);
 
-        Bukkit.getLogger().log(Level.SEVERE, "Error while opening SmartInventory:", exception);
+        plugin.getLogger().log(Level.SEVERE, "Error while opening SmartInventory:", exception);
     }
 
     public void handleInventoryUpdateError(SmartInventory inventory, Player player, Exception exception) {
         inventory.close(player);
 
-        Bukkit.getLogger().log(Level.SEVERE, "Error while updating SmartInventory:", exception);
+        plugin.getLogger().log(Level.SEVERE, "Error while updating SmartInventory:", exception);
     }
 
     @SuppressWarnings("unchecked")
@@ -230,7 +231,7 @@ public class InventoryManager {
                 inventories.remove(p.getUniqueId());
                 contents.remove(p.getUniqueId());
             } else
-                Bukkit.getScheduler().runTask(plugin, () -> p.openInventory(e.getInventory()));
+                plugin.getServer().getScheduler().runTask(plugin, () -> p.openInventory(e.getInventory()));
         }
 
         @EventHandler(priority = EventPriority.LOW)
@@ -257,7 +258,7 @@ public class InventoryManager {
                         .filter(listener -> listener.getType() == PluginDisableEvent.class)
                         .forEach(listener -> ((InventoryListener<PluginDisableEvent>) listener).accept(e));
 
-                inv.close(Bukkit.getPlayer(player));
+                inv.close(plugin.getServer().getPlayer(player));
             });
 
             inventories.clear();
@@ -271,7 +272,7 @@ public class InventoryManager {
         @Override
         public void run() {
             new HashMap<>(inventories).forEach((uuid, inv) -> {
-                Player player = Bukkit.getPlayer(uuid);
+                Player player = plugin.getServer().getPlayer(uuid);
 
                 try {
                     inv.getProvider().update(player, contents.get(uuid));

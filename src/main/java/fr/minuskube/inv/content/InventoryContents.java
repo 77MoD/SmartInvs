@@ -22,18 +22,16 @@ public interface InventoryContents {
     SlotIterator newIterator(String id, SlotIterator.Type type, int startRow, int startColumn);
     SlotIterator newIterator(SlotIterator.Type type, int startRow, int startColumn);
 
-    SlotIterator newIterator(String id, SlotIterator.Type type, SlotPos startPos);
-    SlotIterator newIterator(SlotIterator.Type type, SlotPos startPos);
 
-    ClickableItem[][] all();
+    ClickableItem[] all();
 
-    Optional<SlotPos> firstEmpty();
+    Optional<Integer> firstEmpty();
 
     Optional<ClickableItem> get(int row, int column);
-    Optional<ClickableItem> get(SlotPos slotPos);
+    Optional<ClickableItem> get(int slot);
 
     InventoryContents set(int row, int column, ClickableItem item);
-    InventoryContents set(SlotPos slotPos, ClickableItem item);
+    InventoryContents set(int slot, ClickableItem item);
 
     InventoryContents add(ClickableItem item);
 
@@ -44,7 +42,6 @@ public interface InventoryContents {
 
     InventoryContents fillRect(int fromRow, int fromColumn,
                                int toRow, int toColumn, ClickableItem item);
-    InventoryContents fillRect(SlotPos fromPos, SlotPos toPos, ClickableItem item);
 
     <T> T property(String name);
     <T> T property(String name, T def);
@@ -53,19 +50,19 @@ public interface InventoryContents {
 
     class Impl implements InventoryContents {
 
-        private SmartInventory inv;
-        private UUID player;
+        private final SmartInventory inv;
+        private final UUID player;
 
-        private ClickableItem[][] contents;
+        private final ClickableItem[] contents;
 
-        private Pagination pagination = new Pagination.Impl();
-        private Map<String, SlotIterator> iterators = new HashMap<>();
-        private Map<String, Object> properties = new HashMap<>();
+        private final Pagination pagination = new Pagination.Impl();
+        private final Map<String, SlotIterator> iterators = new HashMap<>();
+        private final Map<String, Object> properties = new HashMap<>();
 
         public Impl(SmartInventory inv, UUID player) {
             this.inv = inv;
             this.player = player;
-            this.contents = new ClickableItem[inv.getRows()][inv.getColumns()];
+            this.contents = new ClickableItem[inv.getColumns()*inv.getRows()];
         }
 
         @Override
@@ -88,31 +85,22 @@ public interface InventoryContents {
             return iterator;
         }
 
-        @Override
-        public SlotIterator newIterator(String id, SlotIterator.Type type, SlotPos startPos) {
-            return newIterator(id, type, startPos.getRow(), startPos.getColumn());
-        }
+
 
         @Override
         public SlotIterator newIterator(SlotIterator.Type type, int startRow, int startColumn) {
             return new SlotIterator.Impl(this, inv, type, startRow, startColumn);
         }
 
-        @Override
-        public SlotIterator newIterator(SlotIterator.Type type, SlotPos startPos) {
-            return newIterator(type, startPos.getRow(), startPos.getColumn());
-        }
 
         @Override
-        public ClickableItem[][] all() { return contents; }
+        public ClickableItem[] all() { return contents; }
 
         @Override
-        public Optional<SlotPos> firstEmpty() {
-            for (int row = 0; row < contents.length; row++) {
-                for(int column = 0; column < contents[0].length; column++) {
-                    if(!this.get(row, column).isPresent())
-                        return Optional.of(new SlotPos(row, column));
-                }
+        public Optional<Integer> firstEmpty() {
+            for (int index = 0; index < contents.length; index++) {
+                    if(!this.get(index).isPresent())
+                        return Optional.of(index);
             }
 
             return Optional.empty();
@@ -120,45 +108,47 @@ public interface InventoryContents {
 
         @Override
         public Optional<ClickableItem> get(int row, int column) {
-            if(row >= contents.length)
-                return Optional.empty();
-            if(column >= contents[row].length)
-                return Optional.empty();
-
-            return Optional.ofNullable(contents[row][column]);
+            return get(getSlot(row, column));
         }
 
         @Override
-        public Optional<ClickableItem> get(SlotPos slotPos) {
-            return get(slotPos.getRow(), slotPos.getColumn());
+        public Optional<ClickableItem> get(int slot) {
+            if(!isInRange(slot))
+                return Optional.empty();
+
+            return Optional.ofNullable(contents[slot]);
+        }
+        private boolean isInRange(int row, int column){
+            return isInRange(getSlot(row, column));
+        }
+        private int getSlot(int row, int column){
+            return row*inv.getColumns()+column;
+        }
+        private boolean isInRange(int slot){
+            return slot < contents.length && slot >= 0;
         }
 
         @Override
         public InventoryContents set(int row, int column, ClickableItem item) {
-            if(row >= contents.length)
-                return this;
-            if(column >= contents[row].length)
-                return this;
+            return set(getSlot(row, column), item);
+        }
 
-            contents[row][column] = item;
-            update(row, column, item != null ? item.getItem() : null);
+        @Override
+        public InventoryContents set(int slot, ClickableItem item) {
+            if(!isInRange(slot))
+                return this;
+            contents[slot] = item;
+            update(slot, item != null ? item.getItem() : null);
             return this;
         }
 
         @Override
-        public InventoryContents set(SlotPos slotPos, ClickableItem item) {
-            return set(slotPos.getRow(), slotPos.getColumn(), item);
-        }
-
-        @Override
         public InventoryContents add(ClickableItem item) {
-            for(int row = 0; row < contents.length; row++) {
-                for(int column = 0; column < contents[0].length; column++) {
-                    if(contents[row][column] == null) {
-                        set(row, column, item);
+            for(int index = 0; index < contents.length; index++) {
+                    if(contents[index] == null) {
+                        set(index, item);
                         return this;
                     }
-                }
             }
 
             return this;
@@ -166,24 +156,24 @@ public interface InventoryContents {
 
         @Override
         public InventoryContents fill(ClickableItem item) {
-            for(int row = 0; row < contents.length; row++)
-                for(int column = 0; column < contents[row].length; column++)
-                    set(row, column, item);
-
+            for(int index = 0; index < contents.length; index++)
+                    set(index, item);
             return this;
         }
 
         @Override
         public InventoryContents fillRow(int row, ClickableItem item) {
-            if(row >= contents.length)
+            if (row < 0 || row >= 6) {
                 return this;
+            }
 
-            for(int column = 0; column < contents[row].length; column++)
-                set(row, column, item);
-
+            int startIndex = row * 9;
+            int endIndex = startIndex + 9;
+            for (int index = startIndex; index < endIndex; index++) {
+                set(index, item);
+            }
             return this;
         }
-
         @Override
         public InventoryContents fillColumn(int column, ClickableItem item) {
             for(int row = 0; row < contents.length; row++)
@@ -212,10 +202,6 @@ public interface InventoryContents {
             return this;
         }
 
-        @Override
-        public InventoryContents fillRect(SlotPos fromPos, SlotPos toPos, ClickableItem item) {
-            return fillRect(fromPos.getRow(), fromPos.getColumn(), toPos.getRow(), toPos.getColumn(), item);
-        }
 
         @SuppressWarnings("unchecked")
         @Override
@@ -235,15 +221,15 @@ public interface InventoryContents {
             return this;
         }
 
-        private void update(int row, int column, ItemStack item) {
+
+        private void update(int slot, ItemStack item) {
             Player currentPlayer = Bukkit.getPlayer(player);
             if(!inv.getManager().getOpenedPlayers(inv).contains(currentPlayer))
                 return;
 
             Inventory topInventory = currentPlayer.getOpenInventory().getTopInventory();
-            topInventory.setItem(inv.getColumns() * row + column, item);
+            topInventory.setItem(slot, item);
         }
-
     }
 
 }
